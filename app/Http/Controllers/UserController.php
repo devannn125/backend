@@ -121,7 +121,7 @@ class UserController extends Controller
         if (!$user || !Hash::check($request->password, $user->password)) {
             return response()->json([
                 'success' => false,
-                'message' => 'Email atau password salah.',
+                'message' => 'Invalid email or password.',
             ], 401);
         }
 
