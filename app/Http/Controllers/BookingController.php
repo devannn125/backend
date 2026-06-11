@@ -13,13 +13,12 @@ use Illuminate\Validation\Rule;
 
 class BookingController extends Controller
 {
-    // Relasi yang selalu di-load untuk history Flutter
     private const WITH_HISTORY = [
         'bookingDetails.room.hotel',
         'payments',
+        'reviews',
     ];
 
-    // Relasi tambahan untuk detail lengkap
     private const WITH_DETAIL = [
         'bookingDetails.room.hotel',
         'payments',
@@ -27,13 +26,19 @@ class BookingController extends Controller
         'user',
     ];
 
+    // 🟢 PERBAIKAN: Tambahkan konstanta khusus untuk memuat data setelah checkout/store baru
+    private const WITH_STORE = [
+        'bookingDetails.room.hotel',
+        'payments',
+        'user',
+    ];
+
     public function index(Request $request): JsonResponse
     {
-        // Gunakan authenticated user, bukan dari request body
         $userId = $request->user()->id_user;
 
         $query = Bookings::with(self::WITH_HISTORY)
-            ->byUser($userId)
+            ->where('id_user', $userId)
             ->orderByDesc('tanggal_booking');
 
         if ($request->filled('status')) {
@@ -48,6 +53,12 @@ class BookingController extends Controller
 
     public function store(Request $request): JsonResponse
     {
+        if ($request->has('metode_pembayaran')) {
+            $request->merge([
+                'metode_pembayaran' => strtolower($request->metode_pembayaran)
+            ]);
+        }
+
         $validated = $request->validate([
             'id_room'           => 'required|string|exists:rooms,id_room',
             'check_in'          => 'required|date|after_or_equal:today',
@@ -59,48 +70,57 @@ class BookingController extends Controller
             ])],
         ]);
 
-        $booking = DB::transaction(function () use ($request, $validated) {
-            $userId      = $request->user()->id_user;
-            $checkIn     = Carbon::parse($validated['check_in']);
-            $checkOut    = Carbon::parse($validated['check_out']);
-            $jumlahMalam = $checkIn->diffInDays($checkOut);
+        try {
+            $booking = DB::transaction(function () use ($request, $validated) {
+                $userId      = $request->user()->id_user;
+                $checkIn     = Carbon::parse($validated['check_in']);
+                $checkOut    = Carbon::parse($validated['check_out']);
+                $jumlahMalam = $checkIn->diffInDays($checkOut);
 
-            // 1. Buat booking
-            $booking = Bookings::create([
-                'id_user'         => $userId,
-                'tanggal_booking' => now(),
-                'check_in'        => $validated['check_in'],
-                'check_out'       => $validated['check_out'],
-                'total_harga'     => $validated['total_harga'],
-                'status'          => Bookings::STATUS_PENDING,
-            ]);
+                // 1. Buat data booking utama
+                $booking = Bookings::create([
+                    'id_user'         => $userId,
+                    'tanggal_booking' => now(),
+                    'check_in'        => $validated['check_in'],
+                    'check_out'       => $validated['check_out'],
+                    'total_harga'     => $validated['total_harga'],
+                    'status'          => Bookings::STATUS_PENDING,
+                ]);
 
-            // 2. Buat booking_detail — penghubung ke room & hotel
-            BookingDetails::create([
-                'id_booking'   => $booking->id_booking,
-                'id_room'      => $validated['id_room'],
-                'harga'        => $validated['harga_per_malam'],
-                'jumlah_malam' => $jumlahMalam,
-                'subtotal'     => $validated['harga_per_malam'] * $jumlahMalam,
-                'status'       => BookingDetails::STATUS_PENDING,
-            ]);
+                // 2. Buat booking_detail
+                BookingDetails::create([
+                    'id_booking'   => $booking->id_booking,
+                    'id_room'      => $validated['id_room'],
+                    'harga'        => $validated['harga_per_malam'],
+                    'jumlah_malam' => $jumlahMalam,
+                    'subtotal'     => $validated['harga_per_malam'] * $jumlahMalam,
+                    'status'       => BookingDetails::STATUS_PENDING,
+                ]);
 
-            // 3. Buat payment
-            Payments::create([
-                'id_booking'        => $booking->id_booking,
-                'metode_pembayaran' => $validated['metode_pembayaran'],
-                'jumlah_bayar'      => $validated['total_harga'],
-                'status_pembayaran' => Payments::STATUS_PENDING,
-                'expired_at'        => now()->addHours(24),
-            ]);
+                // 3. Buat data transaksi payment terkait
+                Payments::create([
+                    'id_booking'        => $booking->id_booking,
+                    'metode_pembayaran' => $validated['metode_pembayaran'],
+                    'jumlah_bayar'      => $validated['total_harga'],
+                    'status_pembayaran' => Payments::STATUS_PENDING,
+                    'expired_at'        => now()->addHours(24),
+                ]);
 
-            return $booking;
-        });
+                return $booking;
+            }); 
 
-        return response()->json([
-            'success' => true,
-            'data'    => $booking->load(self::WITH_DETAIL),
-        ], 201);
+            return response()->json([
+                'success' => true,
+                // 🟢 PERBAIKAN: Menggunakan WITH_STORE agar tidak crash memanggil data addon yang belum ada
+                'data'    => $booking->load(self::WITH_STORE), 
+            ], 201);
+
+        } catch (\Exception $e) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Gagal membuat booking: ' . $e->getMessage()
+            ], 500);
+        }
     }
 
     public function show(string $id): JsonResponse

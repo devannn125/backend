@@ -53,6 +53,7 @@ class PaymentsController extends Controller
                 Payments::METODE_EWALLET,
                 Payments::METODE_CREDIT_CARD,
                 Payments::METODE_VIRTUAL_ACCOUNT,
+                'qris',
             ])],
             'jumlah_bayar'        => 'required|numeric|min:0',
             'expired_at'          => 'nullable|date|after:now',
