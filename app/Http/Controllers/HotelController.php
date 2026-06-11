@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Models\Hotels;
+use App\Models\RoomTypes;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Storage;
@@ -11,7 +12,22 @@ class HotelController extends Controller
 {
     public function index(Request $request): JsonResponse
     {
-        $query = Hotels::with('facilities');
+        $minPriceSubquery = RoomTypes::selectRaw('MIN(room_types.harga_per_malam)')
+            ->join('rooms', 'rooms.id_room_type', 'room_types.id_room_type')
+            ->whereColumn('rooms.id_hotel', 'hotels.id_hotel');
+
+        $query = Hotels::with('facilities')
+            ->select('hotels.*')
+            ->selectSub($minPriceSubquery, 'min_price');
+
+        if ($request->filled('search')) {
+            $search = '%' . $request->search . '%';
+            $query->where(function ($builder) use ($search) {
+                $builder->where('nama_hotel', 'like', $search)
+                    ->orWhere('kota', 'like', $search)
+                    ->orWhere('alamat', 'like', $search);
+            });
+        }
 
         if ($request->filled('kota')) {
             $query->byKota($request->kota);
@@ -19,6 +35,22 @@ class HotelController extends Controller
 
         if ($request->filled('rating')) {
             $query->minRating((float) $request->rating);
+        }
+
+        if ($request->filled('sort_by')) {
+            $sortDir = strtolower($request->get('sort_dir', 'asc')) === 'desc' ? 'desc' : 'asc';
+
+            if ($request->sort_by === 'price') {
+                if ($sortDir === 'asc') {
+                    $query->orderByRaw('COALESCE(min_price, 999999999) asc');
+                } else {
+                    $query->orderByRaw('COALESCE(min_price, -1) desc');
+                }
+            } elseif ($request->sort_by === 'rating') {
+                $query->orderBy('rating', $sortDir);
+            }
+        } else {
+            $query->orderByDesc('created_at');
         }
 
         return response()->json(['success' => true, 'data' => $query->paginate($request->get('per_page', 10))]);
