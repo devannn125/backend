@@ -7,7 +7,9 @@ use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Storage;
+use Illuminate\Support\Str;
 use Illuminate\Validation\Rules\Password;
+use Google_Client;
 
 class UserController extends Controller
 {
@@ -78,45 +80,47 @@ class UserController extends Controller
 
     public function updateProfile(Request $request): JsonResponse
     {
-        $user = clone $request->user();
+        $user = $request->user(); // Tidak perlu 'clone' kecuali ada kebutuhan spesifik
 
         $validated = $request->validate([
-            'nama'       => 'sometimes|required|string|max:100',
-            'no_hp'      => 'nullable|string|max:20',
-            'alamat'     => 'nullable|string',
+            'nama' => 'sometimes|required|string|max:100',
+            'no_hp' => 'nullable|string|max:20',
+            'alamat' => 'nullable|string',
+            // Izinkan 'remove_image' dikirim dari Flutter sebagai indikator hapus
             'user_image' => 'nullable|image|mimes:jpg,jpeg,png,webp|max:2048',
+            'remove_image' => 'nullable|string',
         ]);
 
+        // 1. LOGIKA HAPUS FOTO
+        // Jika Flutter mengirim 'remove_image' = 'true', maka hapus foto lama
+        if ($request->has('remove_image') && $request->remove_image == 'true') {
+            if ($user->user_image) {
+                Storage::disk('public')->delete($user->user_image);
+                $user->user_image = null; // Set ke null di DB
+                $user->save();
+            }
+        }
+
+        // 2. LOGIKA UPLOAD FOTO (Sama seperti sebelumnya)
         if ($request->hasFile('user_image')) {
             $file = $request->file('user_image');
 
-            // 1. Hapus foto lama jika ada
-            // (Sangat penting jika user sebelumnya pakai .png lalu menggantinya dengan .jpg)
             if ($user->user_image) {
                 Storage::disk('public')->delete($user->user_image);
             }
 
-            // 2. Ambil ekstensi asli dari gambar yang diupload (jpg, png, dll)
             $extension = $file->getClientOriginalExtension();
-
-            // 3. Rakit nama file custom: USR001_profile.jpg
             $fileName = $user->id_user . '_profile.' . $extension;
-
-            // 4. Simpan ke folder 'storage/app/public/user' dengan nama yang sudah dirakit
             $path = $file->storeAs('user', $fileName, 'public');
-
-            // 5. Simpan path relatifnya saja ke database (Misal: user/USR001_profile.jpg)
             $validated['user_image'] = $path;
-            
-            // JANGAN gunakan ini jika pakai ngrok: 
-            // $validated['user_image'] = asset('storage/' . $path); 
         }
 
+        // 3. UPDATE DATA
         $user->update($validated);
 
         return response()->json([
             'success' => true,
-            'data'    => $user->fresh()->makeHidden('password'),
+            'data' => $user->fresh()->makeHidden('password'),
         ]);
     }
 
@@ -125,24 +129,21 @@ class UserController extends Controller
         $user = clone $request->user();
 
         $validated = $request->validate([
-            // Pengecualian unik: Boleh pakai email yang sama asalkan itu milik user ini sendiri
-            'email'    => 'sometimes|required|email|max:100|unique:user,email,' . $user->id_user . ',id_user',
-            'password' => ['nullable', \Illuminate\Validation\Rules\Password::min(8)->letters()->numbers()],
+            'email' => 'sometimes|required|email|max:100|unique:user,email,' . $user->id_user . ',id_user',
+            'password' => ['nullable', Password::min(8)->letters()->numbers()],
         ]);
 
-        // Hanya enkripsi dan timpa password JIKA user benar-benar mengisinya
         if ($request->filled('password')) {
             $validated['password'] = Hash::make($validated['password']);
         } else {
-            // Jika kosong, buang dari array agar password lama tidak tertimpa string kosong
-            unset($validated['password']); 
+            unset($validated['password']);
         }
 
         $user->update($validated);
 
         return response()->json([
             'success' => true,
-            'data'    => $user->fresh()->makeHidden('password'),
+            'data' => $user->fresh()->makeHidden('password'),
         ]);
     }
 
@@ -202,6 +203,49 @@ class UserController extends Controller
             'token' => $token,
             'data' => $user->makeHidden('password'),
         ]);
+    }
+
+    // --- FUNGSI BARU: GOOGLE LOGIN ---
+    public function googleLogin(Request $request): JsonResponse
+    {
+        $request->validate([
+            'id_token' => 'required|string',
+        ]);
+
+        $client = new Google_Client(['client_id' => env('GOOGLE_CLIENT_ID')]);
+
+        // Pendekatan verifikasi yang lebih fleksibel
+        $payload = $client->verifyIdToken($request->id_token);
+
+        if ($payload) {
+            $email = $payload['email'];
+            $name = $payload['name'];
+
+            $user = User::where('email', $email)->first();
+
+            if (!$user) {
+                $user = new User();
+                $user->email = $email;
+                $user->nama = $name;
+                $user->password = Hash::make(Str::random(24));
+                // user_image dibiarkan null sesuai keinginan Anda
+                $user->save();
+            }
+
+            $token = $user->createToken('auth_token')->plainTextToken;
+
+            return response()->json([
+                'success' => true,
+                'token' => $token,
+                'data' => $user->makeHidden('password'),
+            ]);
+
+        } else {
+            return response()->json([
+                'success' => false,
+                'message' => 'Token Google tidak valid.'
+            ], 401);
+        }
     }
 
     public function logout(Request $request): JsonResponse

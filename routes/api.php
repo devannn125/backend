@@ -17,6 +17,7 @@ use App\Http\Controllers\HotelFacilitiesController;
 // Public Routes
 Route::post('/register', [UserController::class, 'register']);
 Route::post('/login',    [UserController::class, 'login']);
+Route::post('/auth/google', [UserController::class, 'googleLogin']);
 
 // Protected Routes
 Route::middleware('auth:sanctum')->group(function () {
