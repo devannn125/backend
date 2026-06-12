@@ -78,33 +78,45 @@ class UserController extends Controller
 
     public function updateProfile(Request $request): JsonResponse
     {
-        // 1. Ambil data user yang sedang login secara aman via token
         $user = clone $request->user();
 
-        // 2. Validasi KETAT: Hanya 3 field ini yang diterima oleh server
         $validated = $request->validate([
-            'nama' => 'sometimes|required|string|max:100',
-            'no_hp' => 'nullable|string|max:20',
+            'nama'       => 'sometimes|required|string|max:100',
+            'no_hp'      => 'nullable|string|max:20',
+            'alamat'     => 'nullable|string',
             'user_image' => 'nullable|image|mimes:jpg,jpeg,png,webp|max:2048',
         ]);
 
-        // 3. Logika Pemrosesan Gambar (Profile Picture)
         if ($request->hasFile('user_image')) {
-            // Hapus gambar lama dari storage jika sebelumnya sudah punya foto
+            $file = $request->file('user_image');
+
+            // 1. Hapus foto lama jika ada
+            // (Sangat penting jika user sebelumnya pakai .png lalu menggantinya dengan .jpg)
             if ($user->user_image) {
                 Storage::disk('public')->delete($user->user_image);
             }
-            // Simpan gambar baru
-            $validated['user_image'] = $request->file('user_image')->store('user', 'public');
+
+            // 2. Ambil ekstensi asli dari gambar yang diupload (jpg, png, dll)
+            $extension = $file->getClientOriginalExtension();
+
+            // 3. Rakit nama file custom: USR001_profile.jpg
+            $fileName = $user->id_user . '_profile.' . $extension;
+
+            // 4. Simpan ke folder 'storage/app/public/user' dengan nama yang sudah dirakit
+            $path = $file->storeAs('user', $fileName, 'public');
+
+            // 5. Simpan path relatifnya saja ke database (Misal: user/USR001_profile.jpg)
+            $validated['user_image'] = $path;
+            
+            // JANGAN gunakan ini jika pakai ngrok: 
+            // $validated['user_image'] = asset('storage/' . $path); 
         }
 
-        // 4. Eksekusi pembaruan ke MySQL
         $user->update($validated);
 
-        // 5. Kembalikan data terbaru ke Flutter
         return response()->json([
             'success' => true,
-            'data' => $user->fresh()->makeHidden('password'),
+            'data'    => $user->fresh()->makeHidden('password'),
         ]);
     }
 
