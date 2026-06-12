@@ -24,11 +24,11 @@ class UserController extends Controller
     public function store(Request $request): JsonResponse
     {
         $validated = $request->validate([
-            'nama'       => 'required|string|max:100',
-            'email'      => 'required|email|max:100|unique:user,email',
-            'password'   => ['required', Password::min(8)->letters()->numbers()],
-            'no_hp'      => 'nullable|string|max:20',
-            'alamat'     => 'nullable|string',
+            'nama' => 'required|string|max:100',
+            'email' => 'required|email|max:100|unique:user,email',
+            'password' => ['required', Password::min(8)->letters()->numbers()],
+            'no_hp' => 'nullable|string|max:20',
+            'alamat' => 'nullable|string',
             'user_image' => 'nullable|image|mimes:jpg,jpeg,png,webp|max:2048',
         ]);
 
@@ -40,7 +40,7 @@ class UserController extends Controller
 
         return response()->json([
             'success' => true,
-            'data'    => User::create($validated)->makeHidden('password'),
+            'data' => User::create($validated)->makeHidden('password'),
         ], 201);
     }
 
@@ -49,11 +49,11 @@ class UserController extends Controller
         $user = User::findOrFail($id);
 
         $validated = $request->validate([
-            'nama'       => 'sometimes|string|max:100',
-            'email'      => 'sometimes|email|max:100|unique:user,email,' . $id . ',id_user',
-            'password'   => ['sometimes', Password::min(8)->letters()->numbers()],
-            'no_hp'      => 'nullable|string|max:20',
-            'alamat'     => 'nullable|string',
+            'nama' => 'sometimes|string|max:100',
+            'email' => 'sometimes|email|max:100|unique:user,email,' . $id . ',id_user',
+            'password' => ['sometimes', Password::min(8)->letters()->numbers()],
+            'no_hp' => 'nullable|string|max:20',
+            'alamat' => 'nullable|string',
             'user_image' => 'nullable|image|mimes:jpg,jpeg,png,webp|max:2048',
         ]);
 
@@ -72,7 +72,39 @@ class UserController extends Controller
 
         return response()->json([
             'success' => true,
-            'data'    => $user->fresh()->makeHidden('password'),
+            'data' => $user->fresh()->makeHidden('password'),
+        ]);
+    }
+
+    public function updateProfile(Request $request): JsonResponse
+    {
+        // 1. Ambil data user yang sedang login secara aman via token
+        $user = clone $request->user();
+
+        // 2. Validasi KETAT: Hanya 3 field ini yang diterima oleh server
+        $validated = $request->validate([
+            'nama' => 'sometimes|required|string|max:100',
+            'no_hp' => 'nullable|string|max:20',
+            'user_image' => 'nullable|image|mimes:jpg,jpeg,png,webp|max:2048',
+        ]);
+
+        // 3. Logika Pemrosesan Gambar (Profile Picture)
+        if ($request->hasFile('user_image')) {
+            // Hapus gambar lama dari storage jika sebelumnya sudah punya foto
+            if ($user->user_image) {
+                Storage::disk('public')->delete($user->user_image);
+            }
+            // Simpan gambar baru
+            $validated['user_image'] = $request->file('user_image')->store('user', 'public');
+        }
+
+        // 4. Eksekusi pembaruan ke MySQL
+        $user->update($validated);
+
+        // 5. Kembalikan data terbaru ke Flutter
+        return response()->json([
+            'success' => true,
+            'data' => $user->fresh()->makeHidden('password'),
         ]);
     }
 
@@ -85,11 +117,11 @@ class UserController extends Controller
     public function register(Request $request): JsonResponse
     {
         $validated = $request->validate([
-            'nama'       => 'required|string|max:100',
-            'email'      => 'required|email|max:100|unique:user,email',
-            'password'   => ['required', Password::min(8)->letters()->numbers()],
-            'no_hp'      => 'nullable|string|max:20',
-            'alamat'     => 'nullable|string',
+            'nama' => 'required|string|max:100',
+            'email' => 'required|email|max:100|unique:user,email',
+            'password' => ['required', Password::min(8)->letters()->numbers()],
+            'no_hp' => 'nullable|string|max:20',
+            'alamat' => 'nullable|string',
             'user_image' => 'nullable|image|mimes:jpg,jpeg,png,webp|max:2048',
         ]);
 
@@ -99,20 +131,20 @@ class UserController extends Controller
             $validated['user_image'] = $request->file('user_image')->store('user', 'public');
         }
 
-        $user  = User::create($validated);
+        $user = User::create($validated);
         $token = $user->createToken('auth_token')->plainTextToken;
 
         return response()->json([
             'success' => true,
-            'token'   => $token,
-            'data'    => $user->makeHidden('password'),
+            'token' => $token,
+            'data' => $user->makeHidden('password'),
         ], 201);
     }
 
     public function login(Request $request): JsonResponse
     {
         $request->validate([
-            'email'    => 'required|email',
+            'email' => 'required|email',
             'password' => 'required',
         ]);
 
@@ -129,8 +161,8 @@ class UserController extends Controller
 
         return response()->json([
             'success' => true,
-            'token'   => $token,
-            'data'    => $user->makeHidden('password'),
+            'token' => $token,
+            'data' => $user->makeHidden('password'),
         ]);
     }
 

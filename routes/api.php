@@ -24,6 +24,11 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::post('/logout', [UserController::class, 'logout']);
 
     // ----------------------------------------------------------------
+    // --- ROUTE UNTUK UPDATE PROFILE ---
+    // ----------------------------------------------------------------
+    Route::post('/profile', [UserController::class, 'updateProfile']);
+
+    // ----------------------------------------------------------------
     // Bookings — route statis WAJIB di atas /{id}
     // ----------------------------------------------------------------
     Route::prefix('bookings')->group(function () {
