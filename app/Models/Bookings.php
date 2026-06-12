@@ -72,6 +72,11 @@ class Bookings extends Model
         return $this->hasOne(Payments::class, 'id_booking', 'id_booking');
     }
 
+    public function reviews()
+    {
+        return $this->hasMany(Reviews::class, 'id_booking', 'id_booking'); 
+    }
+
     // Scopes
     public function scopeStatus($query, string $status)
     {
