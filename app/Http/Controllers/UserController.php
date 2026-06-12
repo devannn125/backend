@@ -120,6 +120,32 @@ class UserController extends Controller
         ]);
     }
 
+    public function updatePrivacy(Request $request): JsonResponse
+    {
+        $user = clone $request->user();
+
+        $validated = $request->validate([
+            // Pengecualian unik: Boleh pakai email yang sama asalkan itu milik user ini sendiri
+            'email'    => 'sometimes|required|email|max:100|unique:user,email,' . $user->id_user . ',id_user',
+            'password' => ['nullable', \Illuminate\Validation\Rules\Password::min(8)->letters()->numbers()],
+        ]);
+
+        // Hanya enkripsi dan timpa password JIKA user benar-benar mengisinya
+        if ($request->filled('password')) {
+            $validated['password'] = Hash::make($validated['password']);
+        } else {
+            // Jika kosong, buang dari array agar password lama tidak tertimpa string kosong
+            unset($validated['password']); 
+        }
+
+        $user->update($validated);
+
+        return response()->json([
+            'success' => true,
+            'data'    => $user->fresh()->makeHidden('password'),
+        ]);
+    }
+
     public function destroy(string $id): JsonResponse
     {
         User::findOrFail($id)->delete();
