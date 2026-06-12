@@ -41,14 +41,49 @@ class ReviewController extends Controller
 
     public function store(Request $request): JsonResponse
     {
+        // 1. Terima kembali id_hotel dari Flutter
         $validated = $request->validate([
-            'id_user' => 'required|string|max:100|exists:user,id_user',
-            'id_hotel' => 'required|string|max:100|exists:hotels,id_hotel',
+            'id_user' => 'required|string|exists:user,id_user', // atau 'users' tergantung nama tabel Anda
+            'id_booking' => 'required|string|exists:bookings,id_booking',
+            'id_hotel' => 'required|string', // 🟢 DITAMBAHKAN LAGI
             'rating' => 'required|integer|min:1|max:5',
             'komentar' => 'nullable|string',
         ]);
 
-        return response()->json(['success' => true, 'data' => Reviews::create($validated)->load(['user:id_user,nama', 'hotel:id_hotel,nama_hotel'])], 201);
+        $booking = \App\Models\Bookings::where('id_booking', $validated['id_booking'])->firstOrFail();
+
+        // Validasi agar tidak review 2x
+        if (\App\Models\Reviews::where('id_booking', $booking->id_booking)->exists()) {
+            return response()->json(['message' => 'Anda sudah mereview pesanan ini.'], 400);
+        }
+
+        // Simpan Review Induk
+        $review = \App\Models\Reviews::create([
+            'id_user' => $validated['id_user'],
+            'id_booking' => $booking->id_booking,
+            'id_hotel' => $validated['id_hotel'], // 🟢 GUNAKAN DATA DARI FLUTTER
+            'rating' => $validated['rating'],
+            'komentar' => $validated['komentar'] ?? null,
+        ]);
+
+        // Simpan Multiple Media jika ada (Silakan di-uncomment jika tabel review_media sudah dibuat)
+        /*
+        if ($request->hasFile('media')) {
+            foreach ($request->file('media') as $file) {
+                $path = $file->store('reviews', 'public');
+                \App\Models\ReviewMedia::create([
+                    'id_review' => $review->id_review,
+                    'media_path' => $path,
+                ]);
+            }
+        }
+        */
+
+        return response()->json([
+            'success' => true, 
+            'message' => 'Review berhasil dikirim',
+            'data' => $review
+        ], 201);
     }
 
     public function update(Request $request, string $id): JsonResponse
