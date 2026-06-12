@@ -35,7 +35,8 @@ Route::middleware('auth:sanctum')->group(function () {
     // ----------------------------------------------------------------
     Route::prefix('bookings')->group(function () {
         Route::get('/',       [BookingController::class, 'index']);
-        Route::get('/rekap',  [BookingController::class, 'rekap']);  // ✅ dipindah ke atas
+        Route::get('/rekap',  [BookingController::class, 'rekap']);
+        Route::get('/{id}/download-pdf', [BookingController::class, 'downloadPdf']);
         Route::post('/',      [BookingController::class, 'store']);
         Route::get('/{id}',   [BookingController::class, 'show']);
         Route::put('/{id}',   [BookingController::class, 'update']);

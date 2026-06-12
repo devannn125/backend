@@ -10,6 +10,7 @@ use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\Rule;
+use Barryvdh\DomPDF\Facade\Pdf;
 
 class BookingController extends Controller
 {
@@ -21,6 +22,7 @@ class BookingController extends Controller
 
     private const WITH_DETAIL = [
         'bookingDetails.room.hotel',
+        'bookingDetails.room.roomType',
         'payments',
         'bookingAddons.addon',
         'user',
@@ -182,5 +184,22 @@ class BookingController extends Controller
         ->get();
 
         return response()->json(['success' => true, 'data' => $data]);
+    }
+
+    public function downloadPdf(string $id)
+    {
+        $booking = Bookings::with(self::WITH_DETAIL)->findOrFail($id);
+        $payment = $booking->payments->first();
+
+        $data = [
+            'booking' => $booking,
+            'payment' => $payment,
+            'detail'  => $booking->bookingDetails->first(),
+            'user'    => $booking->user
+        ];
+
+        $pdf = Pdf::loadView('pdf.invoice', $data);
+
+        return $pdf->download('invoice-' . $booking->id_booking . '.pdf');
     }
 }
