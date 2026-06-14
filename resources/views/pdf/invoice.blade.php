@@ -1,5 +1,6 @@
 <!DOCTYPE html>
 <html lang="en">
+
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -10,6 +11,7 @@
             size: A4;
             margin: 0;
         }
+
         body {
             font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif;
             color: #1a1a1a;
@@ -18,7 +20,7 @@
             background-color: #ffffff;
             -webkit-print-color-adjust: exact;
         }
-        
+
         /* Container Utama menyerupai kertas */
         .invoice-box {
             max-width: 800px;
@@ -35,15 +37,18 @@
             width: 100%;
             margin-bottom: 50px;
         }
+
         .header-left {
             display: table-cell;
             vertical-align: top;
         }
+
         .header-right {
             display: table-cell;
             text-align: right;
             vertical-align: top;
         }
+
         .title {
             font-size: 42px;
             font-weight: 900;
@@ -51,13 +56,14 @@
             margin: 0;
             color: #000000;
         }
+
         .subtitle {
             font-size: 20px;
             font-weight: 700;
             margin-top: 5px;
             color: #1a1a1a;
         }
-        
+
         /* Ilustrasi Logo bawaan CSS */
         .logo-placeholder {
             display: inline-block;
@@ -68,6 +74,7 @@
             border-top-right-radius: 35px;
             position: relative;
         }
+
         .logo-inner {
             position: absolute;
             bottom: 0;
@@ -78,6 +85,7 @@
             border-top-left-radius: 20px;
             border-top-right-radius: 20px;
         }
+
         .logo-door {
             position: absolute;
             bottom: 0;
@@ -93,17 +101,20 @@
             width: 100%;
             margin-bottom: 50px;
         }
+
         .details-block {
             display: table-cell;
             width: 50%;
             vertical-align: top;
         }
+
         .details-title {
             font-size: 16px;
             font-weight: 700;
             margin-bottom: 12px;
             color: #000000;
         }
+
         .details-text {
             font-size: 11px;
             line-height: 1.6;
@@ -118,6 +129,7 @@
             margin-bottom: 15px;
             color: #000000;
         }
+
         .invoice-table {
             width: 100%;
             border-collapse: collapse;
@@ -125,26 +137,33 @@
             font-size: 11px;
             margin-bottom: 60px;
         }
-        .invoice-table th, .invoice-table td {
+
+        .invoice-table th,
+        .invoice-table td {
             border: 1px solid #bcbcbc;
             padding: 15px 10px;
             vertical-align: middle;
         }
+
         .invoice-table th {
             font-weight: 700;
             color: #000000;
             background-color: #ffffff;
         }
+
         .invoice-table td {
             color: #333333;
         }
+
         .text-left {
             text-align: left;
             padding-left: 15px !important;
         }
+
         .bg-light-gray {
             background-color: #ffffff;
         }
+
         .font-bold {
             font-weight: 700;
             color: #000000;
@@ -155,17 +174,23 @@
             margin-top: 30px;
             margin-left: 15px;
         }
+
         .paid-stamp {
             display: inline-block;
             width: 90px;
             height: 90px;
-            background-color: #0d8f5b; /* Warna Hijau Utama */
-            color: #ffffff;            /* Tulisan Putih */
+            background-color: #0d8f5b;
+            /* Warna Hijau Utama */
+            color: #ffffff;
+            /* Tulisan Putih */
             font-size: 18px;
             font-weight: 800;
-            line-height: 90px;         /* Mengunci teks tepat di tengah vertikal */
-            text-align: center;        /* Mengunci teks tepat di tengah horizontal */
-            border-radius: 50%;        /* Membentuk lingkaran sempurna */
+            line-height: 90px;
+            /* Mengunci teks tepat di tengah vertikal */
+            text-align: center;
+            /* Mengunci teks tepat di tengah horizontal */
+            border-radius: 50%;
+            /* Membentuk lingkaran sempurna */
             letter-spacing: 1px;
             text-transform: uppercase;
         }
@@ -186,6 +211,7 @@
         }
     </style>
 </head>
+
 <body>
 
     <div class="invoice-box">
@@ -233,29 +259,65 @@
                 </tr>
             </thead>
             <tbody>
+                @php
+                    // 1. Deklarasi nilai yang sudah pasti
+                    $fixedServiceFee = 10000;
+                    $grandTotal = floatval($booking->total_harga ?? 0);
+
+                    // 2. Hitung Subtotal Kamar secara akurat (Harga Satuan x Jumlah Malam)
+                    $hargaSatuan = floatval($detail->harga ?? 0);
+                    $jumlahMalam = intval($detail->jumlah_malam ?? 1);
+                    $subtotalKamar = $hargaSatuan * $jumlahMalam;
+
+                    // 3. Ekstrak nilai Add-ons dari sisa Grand Total
+                    $totalAddons = $grandTotal - $subtotalKamar - $fixedServiceFee;
+                    // Cegah angka negatif jika terjadi anomali data
+                    if ($totalAddons < 0) {
+                        $totalAddons = 0;
+                    }
+                @endphp
+
                 <tr>
                     <td>1</td>
                     <td class="text-left">{{ $detail->room->hotel->nama_hotel ?? '-' }}</td>
                     <td class="text-left">
-                        {{ $detail->room->roomType->nama_type ?? 'Standard Room' }} - {{ $detail->jumlah_malam ?? 1 }} Night
+                        {{ $detail->room->roomType->nama_type ?? 'Standard Room' }} - {{ $jumlahMalam }} Night
                     </td>
-                    <td>Rp {{ number_format($detail->harga ?? 0, 0, ',', '.') }}</td>
-                    <td>Rp {{ number_format($booking->total_harga ?? 0, 0, ',', '.') }}</td>
+                    <td>Rp {{ number_format($hargaSatuan, 0, ',', '.') }}</td>
+                    <td>Rp {{ number_format($subtotalKamar, 0, ',', '.') }}</td>
                 </tr>
+
+                @if($totalAddons > 0)
+                    <tr>
+                        <td>2</td>
+                        <td class="text-left">Additional Add-ons</td>
+                        <td class="text-left">Extra Facilities & Services</td>
+                        <td>-</td>
+                        <td>Rp {{ number_format($totalAddons, 0, ',', '.') }}</td>
+                    </tr>
+                @endif
+
                 <tr>
-                    <td colspan="3" style="text-align: right; padding-right: 20px; color: #4a4a4a;">
+                    <td colspan="3"
+                        style="text-align: right; border-bottom: none; padding-right: 20px; color: #4a4a4a;">
                         Payment with {{ strtoupper($payment->metode_pembayaran ?? 'QRIS') }}
                     </td>
-                    <td class="bg-light-gray font-bold">Total Payment</td>
-                    <td class="bg-light-gray font-bold">Rp {{ number_format($booking->total_harga ?? 0, 0, ',', '.') }}</td>
+                    <td class="bg-light-gray text-left">Service Fee</td>
+                    <td class="bg-light-gray">Rp {{ number_format($fixedServiceFee, 0, ',', '.') }}</td>
+                </tr>
+
+                <tr>
+                    <td colspan="3" style="border-top: none; border-right: none;"></td>
+                    <td class="bg-light-gray font-bold text-left">Total Payment</td>
+                    <td class="bg-light-gray font-bold">Rp {{ number_format($grandTotal, 0, ',', '.') }}</td>
                 </tr>
             </tbody>
         </table>
 
         @if(($booking->status ?? '') === 'success' || ($payment->status_pembayaran ?? '') === 'success')
-        <div class="paid-stamp-container">
-            <div class="paid-stamp">PAID</div>
-        </div>
+            <div class="paid-stamp-container">
+                <div class="paid-stamp">PAID</div>
+            </div>
         @endif
 
         <div class="footer-bar">
@@ -264,4 +326,5 @@
     </div>
 
 </body>
+
 </html>
