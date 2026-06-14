@@ -186,20 +186,38 @@ class BookingController extends Controller
         return response()->json(['success' => true, 'data' => $data]);
     }
 
-    public function downloadPdf(string $id)
+    
+    // Fungsi 1: Untuk Tombol PREVIEW
+    public function previewPdf(string $id)
     {
-        $booking = Bookings::with(self::WITH_DETAIL)->findOrFail($id);
-        $payment = $booking->payments->first();
-
-        $data = [
+        $booking = Bookings::with(self::WITH_DETAIL)->where('id_booking', $id)->firstOrFail();
+        $payment = $booking->payments; // Ingat, tanpa ->first()
+        
+        $pdf = Pdf::loadView('pdf.invoice', [
             'booking' => $booking,
             'payment' => $payment,
             'detail'  => $booking->bookingDetails->first(),
             'user'    => $booking->user
-        ];
+        ]);
 
-        $pdf = Pdf::loadView('pdf.invoice', $data);
+        // Menggunakan STREAM untuk dibuka di browser
+        return $pdf->stream('invoice-' . $booking->id_booking . '.pdf');
+    }
 
+    // Fungsi 2: Untuk Tombol DOWNLOAD
+    public function downloadPdf(string $id)
+    {
+        $booking = Bookings::with(self::WITH_DETAIL)->where('id_booking', $id)->firstOrFail();
+        $payment = $booking->payments; 
+        
+        $pdf = Pdf::loadView('pdf.invoice', [
+            'booking' => $booking,
+            'payment' => $payment,
+            'detail'  => $booking->bookingDetails->first(),
+            'user'    => $booking->user
+        ]);
+
+        // Menggunakan DOWNLOAD untuk langsung disimpan
         return $pdf->download('invoice-' . $booking->id_booking . '.pdf');
     }
 }

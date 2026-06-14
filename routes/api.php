@@ -19,6 +19,10 @@ Route::post('/register', [UserController::class, 'register']);
 Route::post('/login',    [UserController::class, 'login']);
 Route::post('/auth/google', [UserController::class, 'googleLogin']);
 
+// Khusus untuk PDF Invoice
+Route::get('/bookings/{id}/preview-pdf', [BookingController::class, 'previewPdf']);
+Route::get('/bookings/{id}/download-pdf', [BookingController::class, 'downloadPdf']);
+
 // Protected Routes
 Route::middleware('auth:sanctum')->group(function () {
 
@@ -36,7 +40,6 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::prefix('bookings')->group(function () {
         Route::get('/',       [BookingController::class, 'index']);
         Route::get('/rekap',  [BookingController::class, 'rekap']);
-        Route::get('/{id}/download-pdf', [BookingController::class, 'downloadPdf']);
         Route::post('/',      [BookingController::class, 'store']);
         Route::get('/{id}',   [BookingController::class, 'show']);
         Route::put('/{id}',   [BookingController::class, 'update']);
