@@ -86,14 +86,15 @@ class UserController extends Controller
             'nama' => 'sometimes|required|string|max:100',
             'no_hp' => 'nullable|string|max:20',
             'alamat' => 'nullable|string',
-            // Izinkan 'remove_image' dikirim dari Flutter sebagai indikator hapus
             'user_image' => 'nullable|image|mimes:jpg,jpeg,png,webp|max:2048',
-            'remove_image' => 'nullable|string',
+            'remove_image' => 'nullable|boolean',
         ]);
+        $shouldRemoveImage = $request->boolean('remove_image');
+        unset($validated['remove_image']);
 
         // 1. LOGIKA HAPUS FOTO
         // Jika Flutter mengirim 'remove_image' = 'true', maka hapus foto lama
-        if ($request->has('remove_image') && $request->remove_image == 'true') {
+        if ($shouldRemoveImage) {
             if ($user->user_image) {
                 Storage::disk('public')->delete($user->user_image);
                 $user->user_image = null; // Set ke null di DB
