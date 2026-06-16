@@ -10,25 +10,19 @@ use Illuminate\Validation\Rule;
 
 class PaymentsController extends Controller
 {
-    /**
-     * GET /payments
-     * Tampilkan semua data pembayaran (dengan filter opsional)
-     */
+    // Definisikan sekali agar konsisten di semua method
+    const PAYMENT_RELATIONS = ['booking.bookingDetails.room.hotel'];
+
     public function index(Request $request): JsonResponse
     {
-        $query = Payments::with('booking');
+        $query = Payments::with(self::PAYMENT_RELATIONS); // ✅
 
-        // Filter by status
         if ($request->filled('status')) {
             $query->where('status_pembayaran', $request->status);
         }
-
-        // Filter by metode pembayaran
         if ($request->filled('metode')) {
             $query->where('metode_pembayaran', $request->metode);
         }
-
-        // Filter by booking
         if ($request->filled('id_booking')) {
             $query->where('id_booking', $request->id_booking);
         }
@@ -41,47 +35,39 @@ class PaymentsController extends Controller
         ]);
     }
 
-    /**
-     * POST /payments
-     * Buat pembayaran baru
-     */
     public function store(Request $request): JsonResponse
     {
         $validated = $request->validate([
-            'id_booking'          => 'required|string|exists:bookings,id_booking',
-            'metode_pembayaran'   => ['required', Rule::in([
+            'id_booking'        => 'required|string|exists:bookings,id_booking',
+            'metode_pembayaran' => ['required', Rule::in([
                 Payments::METODE_EWALLET,
                 Payments::METODE_CREDIT_CARD,
                 Payments::METODE_VIRTUAL_ACCOUNT,
                 'qris',
             ])],
-            'jumlah_bayar'        => 'required|numeric|min:0',
-            'expired_at'          => 'nullable|date|after:now',
+            'jumlah_bayar'      => 'required|numeric|min:0',
+            'expired_at'        => 'nullable|date|after:now',
         ]);
 
         $payment = Payments::create([
-            'id_booking'          => $validated['id_booking'],
-            'metode_pembayaran'   => $validated['metode_pembayaran'],
-            'jumlah_bayar'        => $validated['jumlah_bayar'],
-            'status_pembayaran'   => Payments::STATUS_PENDING,
-            'expired_at'          => $validated['expired_at'] ?? now()->addHours(24),
-            'paid_at'             => null,
+            'id_booking'        => $validated['id_booking'],
+            'metode_pembayaran' => $validated['metode_pembayaran'],
+            'jumlah_bayar'      => $validated['jumlah_bayar'],
+            'status_pembayaran' => Payments::STATUS_PENDING,
+            'expired_at'        => $validated['expired_at'] ?? now()->addHours(24),
+            'paid_at'           => null,
         ]);
 
         return response()->json([
             'success' => true,
             'message' => 'Pembayaran berhasil dibuat.',
-            'data'    => $payment->load('booking'),
+            'data'    => $payment->load(self::PAYMENT_RELATIONS), // ✅
         ], 201);
     }
 
-    /**
-     * GET /payments/{id}
-     * Tampilkan detail pembayaran
-     */
     public function show(string $id): JsonResponse
     {
-        $payment = Payments::with('booking')->findOrFail($id);
+        $payment = Payments::with(self::PAYMENT_RELATIONS)->findOrFail($id); // ✅
 
         return response()->json([
             'success' => true,
@@ -89,10 +75,6 @@ class PaymentsController extends Controller
         ]);
     }
 
-    /**
-     * PUT /payments/{id}
-     * Update data pembayaran
-     */
     public function update(Request $request, string $id): JsonResponse
     {
         $payment = Payments::findOrFail($id);
@@ -113,7 +95,6 @@ class PaymentsController extends Controller
             'paid_at'           => 'sometimes|nullable|date',
         ]);
 
-        // Jika status diubah ke success, set paid_at otomatis
         if (
             isset($validated['status_pembayaran']) &&
             $validated['status_pembayaran'] === Payments::STATUS_SUCCESS &&
@@ -127,14 +108,10 @@ class PaymentsController extends Controller
         return response()->json([
             'success' => true,
             'message' => 'Pembayaran berhasil diperbarui.',
-            'data'    => $payment->fresh('booking'),
+            'data'    => $payment->fresh(self::PAYMENT_RELATIONS), // ✅
         ]);
     }
 
-    /**
-     * DELETE /payments/{id}
-     * Hapus data pembayaran
-     */
     public function destroy(string $id): JsonResponse
     {
         $payment = Payments::findOrFail($id);
@@ -146,14 +123,6 @@ class PaymentsController extends Controller
         ]);
     }
 
-    // -------------------------
-    // Custom Actions
-    // -------------------------
-
-    /**
-     * PATCH /payments/{id}/confirm
-     * Konfirmasi pembayaran → ubah status ke success
-     */
     public function confirm(string $id): JsonResponse
     {
         $payment = Payments::findOrFail($id);
@@ -180,14 +149,10 @@ class PaymentsController extends Controller
         return response()->json([
             'success' => true,
             'message' => 'Pembayaran berhasil dikonfirmasi.',
-            'data'    => $payment->fresh('booking'),
+            'data'    => $payment->fresh(self::PAYMENT_RELATIONS), // ✅
         ]);
     }
 
-    /**
-     * PATCH /payments/{id}/cancel
-     * Batalkan pembayaran
-     */
     public function cancel(string $id): JsonResponse
     {
         $payment = Payments::findOrFail($id);
@@ -206,7 +171,7 @@ class PaymentsController extends Controller
         return response()->json([
             'success' => true,
             'message' => 'Pembayaran berhasil dibatalkan.',
-            'data'    => $payment->fresh('booking'),
+            'data'    => $payment->fresh(self::PAYMENT_RELATIONS), // ✅
         ]);
     }
 }

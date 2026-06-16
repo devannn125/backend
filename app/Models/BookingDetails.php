@@ -26,7 +26,13 @@ class BookingDetails extends Model
 
         static::creating(function ($model) {
             if (empty($model->id_booking_detail)) {
-                $model->id_booking_detail = (string) Str::uuid();
+                // Ambil ID terakhir dengan format BD###
+                $last = static::where('id_booking_detail', 'like', 'BD%')
+                    ->orderByRaw('CAST(SUBSTRING(id_booking_detail, 3) AS UNSIGNED) DESC')
+                    ->value('id_booking_detail');
+
+                $nextNumber = $last ? ((int) substr($last, 2)) + 1 : 1;
+                $model->id_booking_detail = 'BD' . str_pad($nextNumber, 3, '0', STR_PAD_LEFT);
             }
 
             if (empty($model->subtotal) && $model->harga && $model->jumlah_malam) {
