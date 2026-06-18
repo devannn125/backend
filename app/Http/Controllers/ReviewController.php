@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Models\ReviewMedia;
 use App\Models\Reviews;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -10,7 +11,11 @@ class ReviewController extends Controller
 {
     public function index(Request $request): JsonResponse
     {
-        $query = Reviews::with(['user:id_user,nama', 'hotel:id_hotel,nama_hotel']);
+        $query = Reviews::with([
+            'user:id_user,nama,user_image',
+            'hotel:id_hotel,nama_hotel',
+            'media',
+        ]);
 
         if ($request->filled('id_hotel')) {
             $query->where('id_hotel', $request->id_hotel);
@@ -29,7 +34,11 @@ class ReviewController extends Controller
 
     public function show(string $id): JsonResponse
     {
-        return response()->json(Reviews::with(['user:id_user,nama', 'hotel:id_hotel,nama_hotel'])->findOrFail($id));
+        return response()->json(Reviews::with([
+            'user:id_user,nama,user_image',
+            'hotel:id_hotel,nama_hotel',
+            'media',
+        ])->findOrFail($id));
     }
 
     public function summary(string $id_hotel): JsonResponse
@@ -48,6 +57,8 @@ class ReviewController extends Controller
             'id_hotel' => 'required|string', // 🟢 DITAMBAHKAN LAGI
             'rating' => 'required|integer|min:1|max:5',
             'komentar' => 'nullable|string',
+            'media' => 'nullable|array',
+            'media.*' => 'file|mimes:jpg,jpeg,png,webp|max:5120',
         ]);
 
         $booking = \App\Models\Bookings::where('id_booking', $validated['id_booking'])->firstOrFail();
@@ -66,23 +77,25 @@ class ReviewController extends Controller
             'komentar' => $validated['komentar'] ?? null,
         ]);
 
-        // Simpan Multiple Media jika ada (Silakan di-uncomment jika tabel review_media sudah dibuat)
-        /*
+        // Simpan Multiple Media jika ada.
         if ($request->hasFile('media')) {
             foreach ($request->file('media') as $file) {
                 $path = $file->store('reviews', 'public');
-                \App\Models\ReviewMedia::create([
+                ReviewMedia::create([
                     'id_review' => $review->id_review,
                     'media_path' => $path,
                 ]);
             }
         }
-        */
 
         return response()->json([
             'success' => true, 
             'message' => 'Review berhasil dikirim',
-            'data' => $review
+            'data' => $review->fresh()->load([
+                'user:id_user,nama,user_image',
+                'hotel:id_hotel,nama_hotel',
+                'media',
+            ])
         ], 201);
     }
 
@@ -95,7 +108,11 @@ class ReviewController extends Controller
         ]);
         $review->update($validated);
 
-        return response()->json(['success' => true, 'data' => $review->fresh()->load(['user:id_user,nama', 'hotel:id_hotel,nama_hotel'])]);
+        return response()->json(['success' => true, 'data' => $review->fresh()->load([
+            'user:id_user,nama,user_image',
+            'hotel:id_hotel,nama_hotel',
+            'media',
+        ])]);
     }
 
     public function destroy(string $id): JsonResponse

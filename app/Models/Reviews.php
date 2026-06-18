@@ -13,7 +13,14 @@ class Reviews extends Model
     public $timestamps = false;
     const CREATED_AT = 'created_at';
 
-    protected $fillable = ['id_review', 'id_user', 'id_hotel', 'rating', 'komentar'];
+    protected $fillable = [
+        'id_review',
+        'id_user',
+        'id_booking',
+        'id_hotel',
+        'rating',
+        'komentar',
+    ];
     protected $casts = ['rating' => 'integer', 'created_at' => 'datetime'];
 
     protected static function boot(): void
@@ -50,6 +57,11 @@ class Reviews extends Model
     public function hotel()
     {
         return $this->belongsTo(Hotels::class, 'id_hotel', 'id_hotel');
+    }
+
+    public function media()
+    {
+        return $this->hasMany(ReviewMedia::class, 'id_review', 'id_review');
     }
 
     // Scopes
