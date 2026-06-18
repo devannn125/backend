@@ -58,7 +58,7 @@ class ReviewController extends Controller
             'rating' => 'required|integer|min:1|max:5',
             'komentar' => 'nullable|string',
             'media' => 'nullable|array',
-            'media.*' => 'file|mimes:jpg,jpeg,png,webp|max:5120',
+            'media.*' => 'file|mimes:jpg,jpeg,png,webp|max:10240',
         ]);
 
         $booking = \App\Models\Bookings::where('id_booking', $validated['id_booking'])->firstOrFail();
